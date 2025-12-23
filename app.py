@@ -378,13 +378,229 @@ def page_history():
     st.table(data)
 
 
+def page_active_learning():
+    """Page Active Learning et monitoring."""
+    st.title("🎯 Active Learning & Monitoring")
+    st.markdown("---")
+
+    # === 1. ACTIVE LEARNING SELECTION ===
+    st.header("1️⃣ Sélection Intelligente d'Échantillons")
+
+    from core import ActiveLearningEngine, SamplingStrategy
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        strategy = st.selectbox(
+            "Stratégie de sélection",
+            [
+                ("Uncertainty Entropy", SamplingStrategy.UNCERTAINTY_ENTROPY),
+                ("Uncertainty Variance", SamplingStrategy.UNCERTAINTY_VARIANCE),
+                ("Hybrid (Recommandé)", SamplingStrategy.HYBRID_UNCERTAINTY_DIVERSITY),
+                ("Diversity K-Means", SamplingStrategy.DIVERSITY_KMEANS),
+                ("Core-set", SamplingStrategy.REPRESENTATIVE_CORESET),
+            ],
+            format_func=lambda x: x[0]
+        )
+
+    with col2:
+        n_samples = st.slider("Nombre d'échantillons", 5, 50, 10)
+
+    if st.button("🎯 Sélectionner Échantillons", type="primary"):
+        with st.spinner("Sélection en cours..."):
+            # Récupérer les prédictions non validées
+            from database import get_session, Prediction, Image, Annotation
+
+            with get_session() as session:
+                # Images avec prédictions mais sans annotation
+                predictions_query = (
+                    session.query(Prediction)
+                    .join(Image)
+                    .outerjoin(Annotation)
+                    .filter(Annotation.id == None)
+                    .all()
+                )
+
+                if not predictions_query:
+                    st.warning("Aucune prédiction non validée disponible")
+                else:
+                    # Convertir en format dict
+                    pred_dicts = [{
+                        'id': p.id,
+                        'image_id': p.image_id,
+                        'confidence_score': p.confidence_score or 0.5,
+                        'entropy': p.entropy or 0.0,
+                        'variance': p.variance or 0.0,
+                        'margin': p.margin or 0.5,
+                        'uncertainty_level': p.uncertainty_level.value
+                    } for p in predictions_query]
+
+                    # Sélectionner candidats
+                    engine = ActiveLearningEngine(
+                        strategy=strategy[1],
+                        diversity_weight=0.6
+                    )
+
+                    candidates = engine.select_samples_for_annotation(
+                        pred_dicts,
+                        n_samples=min(n_samples, len(pred_dicts))
+                    )
+
+                    st.success(f"✅ {len(candidates)} images sélectionnées")
+
+                    # Afficher les candidats
+                    for i, candidate in enumerate(candidates[:10], 1):
+                        with st.expander(f"#{i} - Image ID {candidate.image_id} - Score: {candidate.score:.3f}"):
+                            col_a, col_b, col_c = st.columns(3)
+
+                            with col_a:
+                                st.metric("Score d'importance", f"{candidate.score:.3f}")
+                            with col_b:
+                                st.metric("Confiance", f"{candidate.confidence:.1%}")
+                            with col_c:
+                                st.metric("Incertitude", candidate.uncertainty_level)
+
+    st.markdown("---")
+
+    # === 2. TRAINING PIPELINE ===
+    st.header("2️⃣ Pipeline de Réentraînement")
+
+    from core import TrainingPipeline
+
+    pipeline = TrainingPipeline()
+    stats = pipeline.get_training_stats()
+
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        st.metric(
+            "Annotations Validées",
+            stats['validated_annotations']
+        )
+
+    with col2:
+        st.metric(
+            "Seuil Re-training",
+            stats['retraining_threshold']
+        )
+
+    with col3:
+        ready = "✅ PRÊT" if stats['ready_for_training'] else "⏳ EN ATTENTE"
+        st.metric("Status", ready)
+
+    # Progress bar
+    progress = min(stats['validated_annotations'] / stats['retraining_threshold'], 1.0)
+    st.progress(progress)
+
+    remaining = max(0, stats['retraining_threshold'] - stats['validated_annotations'])
+    if remaining > 0:
+        st.caption(f"Encore {remaining} annotations nécessaires")
+
+    col_btn1, col_btn2 = st.columns(2)
+
+    with col_btn1:
+        if st.button("🚀 Lancer Re-training", disabled=not stats['ready_for_training'], type="primary"):
+            with st.spinner("⏳ Re-training en cours (cela peut prendre du temps)..."):
+                result = pipeline.run_training_pipeline()
+
+                if result['success']:
+                    st.success("✅ Nouveau modèle créé!")
+                    if result.get('deployed'):
+                        st.balloons()
+                        st.success(f"🎉 Modèle {result['new_version']} déployé!")
+                    else:
+                        st.info(f"Modèle créé mais non déployé (amélioration insuffisante)")
+                else:
+                    st.error(f"❌ Erreur: {result.get('message', 'Unknown error')}")
+
+    with col_btn2:
+        if st.button("📊 Voir Stats Pipeline"):
+            st.json(stats)
+
+    st.markdown("---")
+
+    # === 3. DRIFT DETECTION ===
+    st.header("3️⃣ Détection de Drift")
+
+    from core import DriftDetector
+
+    detector = DriftDetector()
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        ref_days = st.number_input("Période référence (jours)", 7, 90, 30)
+
+    with col2:
+        cur_days = st.number_input("Période actuelle (jours)", 1, 30, 7)
+
+    if st.button("🔍 Détecter Drift", type="primary"):
+        with st.spinner("Analyse en cours..."):
+            try:
+                drift_report = detector.detect_drift(
+                    reference_period_days=ref_days,
+                    current_period_days=cur_days
+                )
+
+                if drift_report.get('drift_detected'):
+                    st.error(f"⚠️ DRIFT DÉTECTÉ: {drift_report.get('drift_type', 'unknown')}")
+                    st.warning(f"Sévérité: {drift_report.get('severity', 'unknown')}")
+
+                    col_a, col_b, col_c = st.columns(3)
+                    with col_a:
+                        st.metric("PSI Score", f"{drift_report.get('avg_psi', 0):.3f}")
+                    with col_b:
+                        st.metric("Échantillons Ref.", drift_report.get('reference_samples', 0))
+                    with col_c:
+                        st.metric("Échantillons Actuels", drift_report.get('current_samples', 0))
+
+                    st.subheader("📋 Recommandations")
+                    for rec in drift_report.get('recommendations', []):
+                        st.info(f"• {rec}")
+                else:
+                    st.success("✅ Pas de drift détecté - Modèle stable")
+
+                    col_a, col_b = st.columns(2)
+                    with col_a:
+                        st.metric("PSI Score", f"{drift_report.get('avg_psi', 0):.3f}")
+                    with col_b:
+                        st.metric("Stabilité", "Excellente")
+
+            except Exception as e:
+                st.error(f"Erreur lors de la détection: {str(e)}")
+
+    st.markdown("---")
+
+    # === 4. MODEL VERSIONING ===
+    st.header("4️⃣ Versions de Modèles")
+
+    from core import ModelVersioningManager
+    import pandas as pd
+
+    manager = ModelVersioningManager()
+    history = manager.get_version_history(limit=10)
+
+    if history:
+        df = pd.DataFrame(history)
+        df['Status'] = df['is_active'].apply(lambda x: "🟢 ACTIF" if x else "⚪ Inactif")
+        df['Created'] = pd.to_datetime(df['created_at']).dt.strftime('%Y-%m-%d %H:%M')
+
+        st.dataframe(
+            df[['Status', 'version', 'metrics_dice', 'metrics_iou', 'Created', 'description']],
+            use_container_width=True,
+            hide_index=True
+        )
+    else:
+        st.info("Aucun historique de version disponible")
+
+
 def main():
     """Point d'entrée principal de l'application."""
     with st.sidebar:
         st.title("🐷 Navigation")
         page = st.radio(
             "Choisir une page",
-            ["🏠 Home", "📋 Validation", "📊 Dashboard", "📜 Historique"],
+            ["🏠 Home", "📋 Validation", "📊 Dashboard", "📜 Historique", "🎯 Active Learning"],
             label_visibility="collapsed"
         )
 
@@ -409,6 +625,8 @@ def main():
         page_dashboard()
     elif page == "📜 Historique":
         page_history()
+    elif page == "🎯 Active Learning":
+        page_active_learning()
 
 
 if __name__ == "__main__":
