@@ -90,6 +90,12 @@ class ImageProcessor:
         """Crée une visualisation overlay."""
         if image.dtype != np.uint8:
             image = self.denormalize(image, to_uint8=True)
+
+        # S'assurer que le masque est de la même taille que l'image
+        if mask.shape[:2] != image.shape[:2]:
+            logger.debug(f"Resizing mask from {mask.shape[:2]} to {image.shape[:2]}")
+            mask = cv2.resize(mask, (image.shape[1], image.shape[0]), interpolation=cv2.INTER_NEAREST)
+
         overlay = image.copy()
         mask_binary = (mask > 0).astype(np.uint8)
         colored_mask = np.zeros_like(image)
@@ -101,6 +107,12 @@ class ImageProcessor:
         """Dessine les contours du masque sur l'image."""
         if image.dtype != np.uint8:
             image = self.denormalize(image, to_uint8=True)
+
+        # S'assurer que le masque est de la même taille que l'image
+        if mask.shape[:2] != image.shape[:2]:
+            logger.debug(f"Resizing mask from {mask.shape[:2]} to {image.shape[:2]}")
+            mask = cv2.resize(mask, (image.shape[1], image.shape[0]), interpolation=cv2.INTER_NEAREST)
+
         result = image.copy()
         mask_binary = (mask > 0).astype(np.uint8) * 255
         contours, _ = cv2.findContours(mask_binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)

@@ -170,6 +170,7 @@ def process_prediction(uploaded_file, image_pil, display_col):
         )
 
         image_array = np.array(image_pil)
+        original_size = image_array.shape[:2]  # (height, width)
         model_size = model_manager.input_shape[1]
         resized = image_processor.resize(image_array, target_size=(model_size, model_size))
         normalized = image_processor.normalize(resized, mode="float")
@@ -183,9 +184,17 @@ def process_prediction(uploaded_file, image_pil, display_col):
         uncertain = is_uncertain(probabilities)
         uncertainty_level = determine_uncertainty_level(confidence)
 
+        # Redimensionner le masque à la taille originale de l'image
+        import cv2
+        mask_original_size = cv2.resize(
+            mask.astype(np.float32),
+            (image_array.shape[1], image_array.shape[0]),  # (width, height)
+            interpolation=cv2.INTER_NEAREST
+        )
+
         mask_filename = f"mask_{image_record.id}.png"
         mask_path = settings.UPLOAD_DIR / mask_filename
-        image_processor.save_mask(mask, mask_path)
+        image_processor.save_mask(mask_original_size, mask_path)
 
         active_model = get_active_model_version()
         prediction_record = create_prediction(
