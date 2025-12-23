@@ -91,6 +91,10 @@ class ImageProcessor:
         if image.dtype != np.uint8:
             image = self.denormalize(image, to_uint8=True)
 
+        # Convertir l'image en RGB si elle est en niveaux de gris
+        if image.ndim == 2:
+            image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
+
         # S'assurer que le masque est de la même taille que l'image
         if mask.shape[:2] != image.shape[:2]:
             logger.debug(f"Resizing mask from {mask.shape[:2]} to {image.shape[:2]}")
@@ -107,6 +111,10 @@ class ImageProcessor:
         """Dessine les contours du masque sur l'image."""
         if image.dtype != np.uint8:
             image = self.denormalize(image, to_uint8=True)
+
+        # Convertir l'image en RGB si elle est en niveaux de gris
+        if image.ndim == 2:
+            image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
 
         # S'assurer que le masque est de la même taille que l'image
         if mask.shape[:2] != image.shape[:2]:
