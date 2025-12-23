@@ -1,0 +1,60 @@
+# ====================================================================
+# PORK SEGMENTATION SUPERVISOR - REQUIREMENTS
+# ====================================================================
+# Système de supervision ML avec active learning pour segmentation
+# de carcasses de porc (mesure TMP)
+# ====================================================================
+
+# ------------------------------------------------------------------
+# DEEP LEARNING & INFERENCE
+# ------------------------------------------------------------------
+tensorflow==2.15.1              # Framework ML principal
+# Note: TensorFlow inclut TFLite pour inference optimisée INT8
+
+numpy==1.26.4                   # Calculs numériques, arrays
+opencv-python==4.10.0.84        # Traitement d'images, preprocessing
+pillow==10.4.0                  # Manipulation images (I/O, resize)
+
+# ------------------------------------------------------------------
+# WEB INTERFACE
+# ------------------------------------------------------------------
+streamlit==1.39.0               # Interface web interactive
+streamlit-image-comparison==0.0.4  # Comparaison avant/après
+plotly==5.24.1                  # Graphiques interactifs (métriques)
+
+# ------------------------------------------------------------------
+# DATABASE & ORM
+# ------------------------------------------------------------------
+sqlalchemy==2.0.36              # ORM pour gestion base de données
+alembic==1.14.0                 # Migrations DB (versioning schéma)
+
+# ------------------------------------------------------------------
+# CONFIGURATION & VALIDATION
+# ------------------------------------------------------------------
+pydantic==2.9.2                 # Validation typée de config
+pydantic-settings==2.6.1        # Gestion settings depuis .env
+python-dotenv==1.0.1            # Chargement variables .env
+
+# ------------------------------------------------------------------
+# LOGGING & MONITORING
+# ------------------------------------------------------------------
+loguru==0.7.3                   # Logging avancé (rotation, couleurs)
+
+# ------------------------------------------------------------------
+# DATA SCIENCE & METRICS
+# ------------------------------------------------------------------
+scikit-learn==1.5.2             # Métriques ML (Dice, IoU), utils
+scipy==1.14.1                   # Calculs scientifiques (entropie)
+pandas==2.2.3                   # Manipulation données tabulaires
+
+# ------------------------------------------------------------------
+# IMAGE VISUALIZATION
+# ------------------------------------------------------------------
+matplotlib==3.9.3               # Plots, visualisations
+seaborn==0.13.2                 # Visualisations statistiques élégantes
+
+# ------------------------------------------------------------------
+# UTILITIES
+# ------------------------------------------------------------------
+tqdm==4.67.1                    # Barres de progression
+python-multipart==0.0.20        # Upload fichiers Streamlit
